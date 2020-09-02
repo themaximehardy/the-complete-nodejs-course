@@ -22,5 +22,3 @@ _Notes based on Andrew Mead's fantastic course._
 | 16  | [ Testing Node.js (Task App) ]()                                                   |
 | 17  | [ Real-Time Web Applications with Socket.io (Chat App) ]()                         |
 | 18  | [ Wrapping Up ]()                                                                  |
-
-Code solutions available [here](https://github.com/flyrightsister/udemy-react-testing-projects).
