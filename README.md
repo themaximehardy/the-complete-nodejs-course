@@ -6,7 +6,7 @@ _Notes based on Andrew Mead's fantastic course._
 | :-- | :--------------------------------------------------------------------------------- |
 | 1   | [ Welcome ](01-Welcome/README.md)                                                  |
 | 2   | [ Installing and Exploring Node.js ](02-Installing-and-Exploring-Nodejs/README.md) |
-| 3   | [ Node.js Module System (Notes App) ]()                                            |
+| 3   | [ Node.js Module System (Notes App) ](03-Nodejs-Module-System/README.md)           |
 | 4   | [ File System and Command Line Args (Notes App) ]()                                |
 | 5   | [ Debugging Node.js (Notes App) ]()                                                |
 | 6   | [ Asynchronous Node.js (Weather App) ]()                                           |
