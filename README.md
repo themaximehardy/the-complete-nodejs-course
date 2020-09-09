@@ -1,4 +1,4 @@
-# React Testing with Jest and Enzyme
+# The Complete Node.js Developer Course (3rd Edition)
 
 _Notes based on Andrew Mead's fantastic course._
 
