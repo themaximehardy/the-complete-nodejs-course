@@ -9,7 +9,7 @@ _Notes based on Andrew Mead's fantastic course._
 | 3   | [ Node.js Module System (Notes App) ](03-Nodejs-Module-System/README.md)                          |
 | 4   | [ File System and Command Line Args (Notes App) ](04-File-System-and-Command-Line-Args/README.md) |
 | 5   | [ Debugging Node.js (Notes App) ](05-Debugging-Nodejs/README.md)                                  |
-| 6   | [ Asynchronous Node.js (Weather App) ]()                                                          |
+| 6   | [ Asynchronous Node.js (Weather App) ](06-Asynchronous-Nodejs/README.md)                          |
 | 7   | [ Web Servers (Weather App) ]()                                                                   |
 | 8   | [ Accessing API from Browser (Weather App) ]()                                                    |
 | 9   | [ Application Deployment (Weather App) ]()                                                        |
