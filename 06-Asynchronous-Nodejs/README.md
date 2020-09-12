@@ -386,16 +386,152 @@ if (!location) {
 }
 ```
 
-### 11. XXX
+### 11. ES6 Aside: Object Property Shorthand and Destructuring
 
-### 12. XXX
+```js
+// playground/5-es6-objects.js
+// Object property shorthand
 
-### 13. XXX
+const name = 'Max';
+const userAge = 29;
 
-### 14. XXX
+const user = {
+  name, // shorthand syntax
+  age: userAge,
+  location: 'Brussels',
+};
 
-### 15. XXX
+console.log(user);
 
-### 16. XXX
+// Object destructuring
 
-### 17. XXX
+const product = {
+  label: 'Red notebook',
+  price: 3,
+  stock: 201,
+  salePrice: undefined,
+};
+
+// const label = product.label;
+// const stock = product.stock;
+
+const { label: newNameLabel, stock, rating = 5 } = product;
+console.log(newNameLabel);
+console.log(stock);
+console.log(rating); // default is used 5, otherwise, undefined
+
+// Object destructuring (as param)
+
+const transaction = (type, { label, stock }) => {
+  console.log(type, label, stock);
+};
+
+transaction('order', product);
+```
+
+### 12. Destructuring and Property Shorthand Challenge
+
+```js
+// weather-app/app.js
+const forecast = require('./utils/forecast');
+const geocode = require('./utils/geocode');
+
+const location = process.argv[2];
+
+if (!location) {
+  console.log('Please provide a location.');
+} else {
+  geocode(location, (error, { lat, long, location } = {}) => {
+    if (error) {
+      return console.log(error);
+    }
+    forecast(long, lat, (error, forecastData) => {
+      if (error) {
+        return console.log(error);
+      }
+      console.log(location);
+      console.log(forecastData);
+    });
+  });
+}
+```
+
+```js
+// weather-app/utils/forecast.js
+const request = require('postman-request');
+
+const forecast = (long, lat, callback) => {
+  const url = `http://api.weatherstack.com/current?access_key=a843dc3f67d5acc6c56c5a236fa7f31c&query=${lat},${long}&units=m`;
+
+  request({ url, json: true }, (error, { body }) => {
+    if (error) {
+      callback('Unable to connect to weather service!');
+    } else if (body.error) {
+      callback('Unable to find location. Try another search.');
+    } else {
+      const { current, location } = body;
+      callback(
+        undefined,
+        `${current.weather_descriptions} in ${location.name} (${location.country}). It is currently ${current.temperature} degrees out. It feels like ${current.feelslike} degrees out`,
+      );
+    }
+  });
+};
+
+module.exports = forecast;
+```
+
+```js
+// weather-app/utils/geocode.js
+const request = require('postman-request');
+
+const geocode = (address, callback) => {
+  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
+    address,
+  )}.json?access_token=pk.eyJ1Ijoiam9obnNtaXRoNzgiLCJhIjoiY2tldjFsNnk4MGsyajJybWU4bmRnaWRucCJ9.2QsD-tv8oYpxB8_wVsWpcw&limit=1`;
+
+  request({ url, json: true }, (error, { body }) => {
+    if (error) {
+      callback('Unable to connect to mapbox service!');
+    } else if (body.features.length === 0) {
+      callback('Unable to find location. Try another search.');
+    } else {
+      const { features } = body;
+      const lat = features[0].center[1];
+      const long = features[0].center[0];
+      const location = features[0].place_name;
+      callback(undefined, { lat, long, location });
+    }
+  });
+};
+
+module.exports = geocode;
+```
+
+### 13. Bonus: HTTP Requests Without a Library
+
+Low level implementation of Nodejs core module [`http`](https://nodejs.org/docs/latest-v12.x/api/http.html#http_http_request_options_callback).
+
+```js
+// playground/6-raw-http.js
+const http = require('http');
+
+const url = `http://api.weatherstack.com/current?access_key=a843dc3f67d5acc6c56c5a236fa7f31c&query=45,-75&units=m`;
+
+const req = http.request(url, (response) => {
+  let data = '';
+  response.on('data', (chunk) => {
+    data = data + chunk.toString();
+  });
+  response.on('end', () => {
+    const body = JSON.parse(data);
+    console.log(body);
+  });
+});
+
+req.on('error', (error) => {
+  console.log('An error: ', error);
+});
+
+req.end();
+```
