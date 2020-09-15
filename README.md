@@ -11,7 +11,7 @@ _Notes based on Andrew Mead's fantastic course._
 | 5   | [ Debugging Node.js (Notes App) ](05-Debugging-Nodejs/README.md)                                  |
 | 6   | [ Asynchronous Node.js (Weather App) ](06-Asynchronous-Nodejs/README.md)                          |
 | 7   | [ Web Servers (Weather App) ](07-Web-Server/README.md)                                            |
-| 8   | [ Accessing API from Browser (Weather App) ]()                                                    |
+| 8   | [ Accessing API from Browser (Weather App) ](08-Accessing-API-from-Browser/README.md)             |
 | 9   | [ Application Deployment (Weather App) ]()                                                        |
 | 10  | [ MongoDB and Promises (Task App) ]()                                                             |
 | 11  | [ REST APIs and Mongoose (Task App) ]()                                                           |

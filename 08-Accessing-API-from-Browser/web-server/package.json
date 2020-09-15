@@ -1,0 +1,29 @@
+{
+  "name": "web-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node ./src/app.js",
+    "dev": "nodemon ./src/app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.17.1",
+    "hbs": "^4.1.1",
+    "postman-request": "^2.88.1-postman.24"
+  },
+  "nodemonConfig": {
+    "watch": [
+      "src",
+      "templates"
+    ],
+    "ext": "js, hbs"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.4"
+  }
+}
