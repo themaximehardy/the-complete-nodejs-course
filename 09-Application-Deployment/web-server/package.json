@@ -1,0 +1,28 @@
+{
+  "name": "web-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "./src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.17.1",
+    "hbs": "^4.1.1",
+    "postman-request": "^2.88.1-postman.24"
+  },
+  "nodemonConfig": {
+    "watch": [
+      "src",
+      "templates"
+    ],
+    "ext": "js, hbs"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.4"
+  }
+}
