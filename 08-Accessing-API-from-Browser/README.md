@@ -210,5 +210,3 @@ weatherForm.addEventListener('submit', (e) => {
   );
 });
 ```
-
-### 7. Wiring up the User Interface
