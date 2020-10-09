@@ -2,7 +2,7 @@
 
 ### 1. Introduction
 
-RESWe're going to create our very own **Express based REST API** using what we now know about data storage. We're also going to explore **Mongoose**! Mongoose is a really popular library when working with Nodejs and MongoDB. It gives us an easy system for modeling our data.
+We're going to create our very own **Express based REST API** using what we now know about data storage. We're also going to explore **Mongoose**! Mongoose is a really popular library when working with Nodejs and MongoDB. It gives us an easy system for modeling our data.
 
 ### 2. Setting up Mongoose
 
@@ -520,22 +520,807 @@ app.listen(port, () => {
 
 ### 10. Resource Reading Endpoints: Part I
 
+Let's have a read at the [queries](https://mongoosejs.com/docs/queries.html).
+
+> Mongoose models provide several static helper functions for CRUD operations. Each of these functions returns a mongoose Query object.
+
+- `Model.deleteMany()`
+- `Model.deleteOne()`
+- `Model.find()`
+- `Model.findById()`
+- `Model.findByIdAndDelete()`
+- `Model.findByIdAndRemove()`
+- `Model.findByIdAndUpdate()`
+- `Model.findOne()`
+- `Model.findOneAndDelete()`
+- `Model.findOneAndRemove()`
+- `Model.findOneAndReplace()`
+- `Model.findOneAndUpdate()`
+- `Model.replaceOne()`
+- `Model.updateMany()`
+- `Model.updateOne()`
+
+```js
+// src/index.js
+const express = require('express');
+require('./db/mongoose');
+const User = require('./models/user');
+const Task = require('./models/task');
+
+const app = express();
+const port = process.env.PORT || 3000;
+
+app.use(express.json());
+
+app.post('/users', (req, res) => {
+  const user = new User(req.body);
+  user
+    .save()
+    .then((user) => res.status(201).send(user))
+    .catch((error) => {
+      res.status(400).send(error.message);
+    });
+});
+
+app.get('/users', (req, res) => {
+  User.find({})
+    .then((users) => res.send(users))
+    .catch(() => {
+      res.status(500).send();
+    });
+});
+
+app.get('/users/:id', (req, res) => {
+  const _id = req.params.id;
+  User.findById(_id)
+    .then((user) => {
+      if (!user) {
+        return res.status(404).send();
+      }
+
+      res.send(user);
+    })
+    .catch(() => {
+      res.status(500).send();
+    });
+});
+
+app.post('/tasks', (req, res) => {
+  const task = new Task(req.body);
+  task
+    .save()
+    .then((task) => res.status(201).send(task))
+    .catch((error) => {
+      res.status(400).send(error);
+    });
+});
+
+app.listen(port, () => {
+  console.log('Server is up on port ', port);
+});
+```
+
 ### 11. Resource Reading Endpoints: Part II
+
+```js
+// src/index.js
+//...
+app.get('/tasks', (req, res) => {
+  Task.find({})
+    .then((tasks) => res.send(tasks))
+    .catch(() => {
+      res.status(500).send();
+    });
+});
+
+app.get('/tasks/:id', (req, res) => {
+  const _id = req.params.id;
+  Task.findById(_id)
+    .then((task) => {
+      if (!task) {
+        return res.status(404).send();
+      }
+
+      res.send(task);
+    })
+    .catch(() => {
+      res.status(500).send();
+    });
+});
+//...
+```
 
 ### 12. Promise Chaining
 
+```js
+const add = (a, b) => {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      resolve(a + b);
+    }, 1000);
+  });
+};
+
+add(1, 2)
+  .then((sum) => {
+    console.log(sum);
+    add(sum, 5)
+      .then((sum2) => {
+        console.log(sum2);
+      })
+      .catch((error) => {
+        console.log(error);
+      });
+  })
+  .catch((error) => {
+    console.log(error);
+  });
+```
+
+We're doing two asynchronous tasks so we're **two levels deep nested**. If we were to add on another asynchronous call it would get **even more complex**. We also have **duplicate code** for catching errors which is not ideal either. There's a better way to get it done using something called **Promise chaining**.
+
+```js
+const add = (a, b) => {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      resolve(a + b);
+    }, 1000);
+  });
+};
+
+add(1, 1)
+  .then((sum) => {
+    console.log(sum);
+    return add(sum, 4);
+  })
+  .then((sum) => {
+    console.log(sum);
+    return add(sum, 5);
+  })
+  .then((sum) => {
+    console.log(sum);
+  })
+  .catch((error) => {
+    console.log(error);
+  });
+```
+
+```js
+// playground/promise-chaining.js
+// get the connection to mongodb via mongoose
+require('../src/db/mongoose');
+// get the user model
+const User = require('../src/models/user');
+
+// find a user by id and update it with the age 1
+User.findByIdAndUpdate('5f7ebee87675a704537a5cfa', { age: 1 })
+  .then((user) => {
+    console.log(user);
+    // return the number of documents where the user is 1 year old
+    return User.countDocuments({ age: 1 });
+  })
+  .then((result) => {
+    // promise chaining
+    console.log(result);
+  })
+  .catch((error) => {
+    console.log(error);
+  });
+```
+
 ### 13. Promise Chaining Challenge
+
+```js
+// playground/promise-chaining-2.js
+require('../src/db/mongoose');
+const Task = require('../src/models/task');
+
+Task.findByIdAndDelete('5f7d69deb1139280099b45c5')
+  .then((task) => {
+    console.log(task);
+    return Task.countDocuments({ completed: false });
+  })
+  .then((result) => {
+    console.log(result);
+  })
+  .catch((error) => {
+    console.log(error);
+  });
+```
 
 ### 14. Async/Await: Part I
 
+`async/await` is one of the **biggest improvement** to the language. It makes so easy to work with our asynchronous promise based code. Writing code that **looks more synchronous** than asynchronous.
+
+```js
+const doWork = () => {};
+
+console.log(doWork()); // undefined
+```
+
+```js
+const doWork = async () => {};
+
+console.log(doWork()); // Promise { undefined }
+```
+
+Now we have changed the return value but as mentioned that `async` functions always return a **promise**. So the return value of `doWork` is not a string. Instead it's a **promise that gets fulfilled with this string**.
+
+```js
+const doWork = async () => {
+  return 'Max';
+};
+
+console.log(doWork()); // Promise { 'Max' }
+```
+
+```js
+const doWork = async () => {
+  return 'Max';
+};
+
+doWork()
+  .then((result) => {
+    console.log('result: ', result); // result:  Max
+  })
+  .catch((error) => {
+    console.log('error: ', error);
+  });
+```
+
+```js
+const doWork = async () => {
+  throw new Error('Something went wrong!');
+  return 'Max';
+};
+
+doWork()
+  .then((result) => {
+    console.log('result: ', result);
+  })
+  .catch((error) => {
+    console.log('error: ', error); // error:  Error: Something went wrong! (+ stack trace)
+  });
+```
+
+```js
+const add = (a, b) => {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      resolve(a + b);
+    }, 1000);
+  });
+};
+
+const doWork = async () => {
+  const sum = await add(1, 99);
+  return sum;
+};
+
+doWork()
+  .then((result) => {
+    console.log('result: ', result); // (after 1 sec) result:  100
+  })
+  .catch((error) => {
+    console.log('error: ', error);
+  });
+```
+
+```js
+const add = (a, b) => {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      resolve(a + b);
+    }, 1000);
+  });
+};
+
+const doWork = async () => {
+  const sum = await add(1, 99);
+  const sum2 = await add(sum, 50);
+  const sum3 = await add(sum2, 3);
+  return sum3;
+};
+
+doWork()
+  .then((result) => {
+    console.log('result: ', result); // (after 3 sec) result:  153
+  })
+  .catch((error) => {
+    console.log('error: ', error);
+  });
+```
+
+**Another big problem with promise chaining** is that it's difficult to have **all of the values** in the **same scope**.
+
+```js
+// SEE THE PROBLEM –
+add(1, 1)
+  .then((sum) => {
+    console.log(sum);
+    return add(sum, 4);
+  })
+  .then((sum) => {
+    // sum 1
+    console.log(sum);
+    return add(sum, 5);
+  })
+  .then((sum) => {
+    // sum 2
+    console.log(sum);
+  })
+  .catch((error) => {
+    console.log(error);
+  });
+```
+
+What if I wanted to have access to both of those sums (`sum1` and `sum2`) at the same time to do something like save them to a database or send them to the user. There's no easy way to do that but we would have to do is create variables in the parent scope and then reassign them in here.
+
+But waht happens if one of these promises (`async/await`) **rejects** instead of **resolves**.
+
+```js
+const add = (a, b) => {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      if (a < 0 || b < 0) {
+        return reject('Number must be non-negative');
+      }
+      resolve(a + b);
+    }, 1000);
+  });
+};
+
+const doWork = async () => {
+  const sum = await add(1, 99);
+  const sum2 = await add(sum, 50);
+  const sum3 = await add(sum2, -3);
+  return sum3;
+};
+
+doWork()
+  .then((result) => {
+    console.log('result: ', result);
+  })
+  .catch((error) => {
+    console.log('error: ', error); // (after 3 sec) error:  Number must be non-negative
+  });
+```
+
 ### 15. Async/Await: Part II
+
+```js
+// playground/async-await.js
+require('../src/db/mongoose');
+const User = require('../src/models/user');
+
+// PROMISE
+// User.findByIdAndUpdate('5f7d6c42fb099c80bf80e081', { age: 1 })
+//   .then((user) => {
+//     console.log(user);
+//     return User.countDocuments({ age: 1 });
+//   })
+//   .then((result) => {
+//     console.log(result);
+//   })
+//   .catch((error) => {
+//     console.log(error);
+//   });
+
+// ASYNC/AWAIT
+const updateAgeAndCount = async (id, age) => {
+  const user = await User.findByIdAndUpdate(id, { age });
+  console.log('user: ', user);
+  const count = await User.countDocuments({ age });
+  console.log('(1) count: ', count);
+  return count;
+};
+
+updateAgeAndCount('5f7d6c42fb099c80bf80e081', 2)
+  .then((count) => {
+    console.log('(2) count: ', count);
+  })
+  .catch((error) => {
+    console.log('error: ', error);
+  });
+```
+
+```js
+// playground/async-await-2.js
+require('../src/db/mongoose');
+const Task = require('../src/models/task');
+
+// PROMISE
+// Task.findByIdAndDelete('5f7d69deb1139280099b45c5')
+//   .then((task) => {
+//     console.log(task);
+//     return Task.countDocuments({ completed: false });
+//   })
+//   .then((result) => {
+//     console.log(result);
+//   })
+//   .catch((error) => {
+//     console.log(error);
+//   });
+
+// ASYNC/AWAIT
+const deleteTaskAndCount = async (id) => {
+  const task = await Task.findByIdAndDelete(id);
+  console.log('task: ', task);
+  const count = await Task.countDocuments({ completed: false });
+  console.log('count: ', count);
+  return count;
+};
+
+deleteTaskAndCount('5f7d69deb1139280099b45c5')
+  .then((count) => {
+    console.log('(2) count: ', count);
+  })
+  .catch((error) => {
+    console.log('error: ', error);
+  });
+```
 
 ### 16. Integrating Async/Await
 
+```js
+// OLD – PROMISE
+app.post('/users', async (req, res) => {
+  const user = new User(req.body);
+
+  user
+    .save()
+    .then((user) => res.status(201).send(user))
+    .catch((error) => {
+      res.status(400).send(error.message);
+    });
+});
+
+// NEW – ASYNC/AWAIT
+app.post('/users', async (req, res) => {
+  const user = new User(req.body);
+
+  try {
+    await user.save();
+    res.status(201).send(user);
+  } catch (error) {
+    res.status(400).send(error.message);
+  }
+});
+```
+
+```js
+// OLD – PROMISE
+app.get('/users', async (req, res) => {
+  User.find({})
+    .then((users) => res.send(users))
+    .catch(() => {
+      res.status(500).send();
+    });
+});
+
+// NEW – ASYNC/AWAIT
+app.get('/users', async (req, res) => {
+  try {
+    const users = await User.find({});
+    res.send(users);
+  } catch (error) {
+    res.status(500).send();
+  }
+});
+```
+
+```js
+// OLD – PROMISE
+app.get('/users/:id', async (req, res) => {
+  User.findById(_id)
+    .then((user) => {
+      if (!user) {
+        return res.status(404).send();
+      }
+
+      res.send(user);
+    })
+    .catch(() => {
+      res.status(500).send();
+    });
+});
+
+// NEW – ASYNC/AWAIT
+app.get('/users/:id', async (req, res) => {
+  const _id = req.params.id;
+  try {
+    const user = await User.findById(_id);
+    if (!user) {
+      return res.status(404).send();
+    }
+    res.send(user);
+  } catch (error) {
+    res.status(500).send();
+  }
+});
+```
+
+Challenge Time –
+
+```js
+// src/index.js
+app.post('/tasks', async (req, res) => {
+  const task = new Task(req.body);
+
+  try {
+    await task.save();
+    res.status(201).send(task);
+  } catch (error) {
+    res.status(400).send(error);
+  }
+  await task.save();
+
+  // OLD – PROMISE
+  // task
+  //   .save()
+  //   .then((task) => res.status(201).send(task))
+  //   .catch((error) => {
+  //     res.status(400).send(error);
+  //   });
+});
+
+app.get('/tasks', async (req, res) => {
+  try {
+    const tasks = await Task.find({});
+    res.send(tasks);
+  } catch (error) {
+    res.status(500).send();
+  }
+
+  // OLD – PROMISE
+  // Task.find({})
+  //   .then((tasks) => res.send(tasks))
+  //   .catch(() => {
+  //     res.status(500).send();
+  //   });
+});
+
+app.get('/tasks/:id', async (req, res) => {
+  const _id = req.params.id;
+  try {
+    const task = await Task.findById(_id);
+    if (!task) {
+      return res.status(404).send();
+    }
+    res.send(task);
+  } catch (error) {
+    res.status(500).send();
+  }
+
+  // OLD – PROMISE
+  // Task.findById(_id)
+  //   .then((task) => {
+  //     if (!task) {
+  //       return res.status(404).send();
+  //     }
+
+  //     res.send(task);
+  //   })
+  //   .catch(() => {
+  //     res.status(500).send();
+  //   });
+});
+```
+
 ### 17. Resource Updating Endpoints: Part I
+
+```js
+// src/index.js
+// V1
+app.patch('/users/:id', async (req, res) => {
+  const _id = req.params.id;
+
+  try {
+    const user = await User.findByIdAndUpdate(_id, req.body, { new: true, runValidators: true });
+    if (!user) {
+      return res.status(404).send();
+    }
+    res.send(user);
+  } catch (error) {
+    res.status(400).send(error.message);
+  }
+});
+```
+
+```js
+// V2
+app.patch('/users/:id', async (req, res) => {
+  const { body, params } = req;
+  const _id = params.id;
+
+  const updates = Object.keys(body);
+  const allowedUpdates = ['name', 'email', 'password', 'age'];
+  const isValidOperation = updates.every((update) => allowedUpdates.includes(update));
+
+  if (!isValidOperation) {
+    return res.status(400).send({ error: 'Invalid update' });
+  }
+
+  try {
+    const user = await User.findByIdAndUpdate(_id, body, { new: true, runValidators: true });
+    if (!user) {
+      return res.status(404).send();
+    }
+    res.send(user);
+  } catch (error) {
+    res.status(400).send(error.message);
+  }
+});
+```
 
 ### 18. Resource Updating Endpoints: Part II
 
+```js
+// src/index.js
+//...
+app.patch('/tasks/:id', async (req, res) => {
+  const { body, params } = req;
+  const _id = params.id;
+
+  const updates = Object.keys(body);
+  const allowedUpdates = ['description', 'completed'];
+  const isValidOperation = updates.every((update) => allowedUpdates.includes(update));
+
+  if (!isValidOperation) {
+    return res.status(400).send({ error: 'Invalid update' });
+  }
+
+  try {
+    const task = await Task.findByIdAndUpdate(_id, body, { new: true, runValidators: true });
+    if (!task) {
+      return res.status(404).send();
+    }
+    res.send(task);
+  } catch (error) {
+    res.status(400).send(error.message);
+  }
+});
+//...
+```
+
 ### 19. Resource Deleting Endpoints
 
+```js
+// src/index.js
+//...
+app.delete('/users/:id', async (req, res) => {
+  const _id = req.params.id;
+
+  try {
+    const user = await User.findByIdAndDelete(_id);
+    if (!user) {
+      return res.status(404).send();
+    }
+    res.send(user);
+  } catch (error) {
+    res.status(500).send();
+  }
+});
+//...
+```
+
+```js
+// src/index.js
+//...
+app.delete('/tasks/:id', async (req, res) => {
+  const _id = req.params.id;
+
+  try {
+    const task = await Task.findByIdAndDelete(_id);
+    if (!task) {
+      return res.status(404).send();
+    }
+    res.send(task);
+  } catch (error) {
+    res.status(500).send();
+  }
+});
+//...
+```
+
 ### 20. Separate Route Files
+
+```js
+// src/index.js
+const express = require('express');
+require('./db/mongoose');
+const userRouter = require('./routers/user');
+const taskRouter = require('./routers/task');
+
+const app = express();
+const port = process.env.PORT || 3000;
+
+app.use(express.json());
+
+// ROUTES
+app.use(userRouter);
+app.use(taskRouter);
+
+app.listen(port, () => {
+  console.log('Server is up on port ', port);
+});
+```
+
+```js
+// src/routers/user.js
+const express = require('express');
+const router = new express.Router();
+const User = require('../models/user');
+
+router.post('/users', async (req, res) => {
+  const user = new User(req.body);
+
+  try {
+    await user.save();
+    res.status(201).send(user);
+  } catch (error) {
+    res.status(400).send(error.message);
+  }
+});
+
+router.get('/users', async (req, res) => {
+  try {
+    const users = await User.find({});
+    res.send(users);
+  } catch (error) {
+    res.status(500).send();
+  }
+});
+
+router.get('/users/:id', async (req, res) => {
+  const _id = req.params.id;
+  try {
+    const user = await User.findById(_id);
+    if (!user) {
+      return res.status(404).send();
+    }
+    res.send(user);
+  } catch (error) {
+    res.status(500).send();
+  }
+});
+
+router.patch('/users/:id', async (req, res) => {
+  const { body, params } = req;
+  const _id = params.id;
+
+  const updates = Object.keys(body);
+  const allowedUpdates = ['name', 'email', 'password', 'age'];
+  const isValidOperation = updates.every((update) => allowedUpdates.includes(update));
+
+  if (!isValidOperation) {
+    return res.status(400).send({ error: 'Invalid update' });
+  }
+
+  try {
+    const user = await User.findByIdAndUpdate(_id, body, { new: true, runValidators: true });
+    if (!user) {
+      return res.status(404).send();
+    }
+    res.send(user);
+  } catch (error) {
+    res.status(400).send(error.message);
+  }
+});
+
+router.delete('/users/:id', async (req, res) => {
+  const _id = req.params.id;
+
+  try {
+    const user = await User.findByIdAndDelete(_id);
+    if (!user) {
+      return res.status(404).send();
+    }
+    res.send(user);
+  } catch (error) {
+    res.status(500).send();
+  }
+});
+
+module.exports = router;
+```
