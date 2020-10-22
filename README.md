@@ -14,8 +14,8 @@ _Notes based on Andrew Mead's fantastic course._
 | 8   | [ Accessing API from Browser (Weather App) ](08-Accessing-API-from-Browser/README.md)             |
 | 9   | [ Application Deployment (Weather App) ](09-Application-Deployment/README.md)                     |
 | 10  | [ MongoDB and Promises (Task App) ](10-MongoDB-and-Promises/README.md)                            |
-| 11  | [ REST APIs and Mongoose (Task App) ]()                                                           |
-| 12  | [ API Authentification and Security (Task App) ]()                                                |
+| 11  | [ REST APIs and Mongoose (Task App) ](11-REST-APIs-and-Mongoose/README.md)                        |
+| 12  | [ API Authentification and Security (Task App) ](12-API-Authentification-and-Security/README.md)  |
 | 13  | [ Sorting, Pagination, and Filtering (Task App) ]()                                               |
 | 14  | [ File Uploads (Task App) ]()                                                                     |
 | 15  | [ Sending Emails (Task App) ]()                                                                   |
