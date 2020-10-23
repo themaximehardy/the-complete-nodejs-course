@@ -29,3 +29,22 @@ app.listen(port, () => {
 // };
 
 // myFunction();
+
+const jwt = require('jsonwebtoken');
+
+const myFunction = async () => {
+  const token = jwt.sign({ _id: 'abc123' }, 'SECRET_RANDOM_SERIES_OF_CHARS', {
+    expiresIn: '7 days',
+  });
+  console.log('token: ', token); // eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiJhYmMxMjMiLCJpYXQiOjE2MDM0Mzg1NTN9.DPtNkzYULXYpCm4zptpIK-U_vDtdRF8UizLFESsVJOY
+
+  const dataOk = jwt.verify(token, 'SECRET_RANDOM_SERIES_OF_CHARS');
+  console.log('dataOk: ', dataOk);
+  // OK – data:  { _id: 'abc123', iat: 1603439346 }
+
+  const dataNope = jwt.verify(token, 'NOPE_SECRET_RANDOM_SERIES_OF_CHARS');
+  console.log('dataNope: ', dataNope);
+  // Nope – JsonWebTokenError: invalid signature
+};
+
+myFunction();
