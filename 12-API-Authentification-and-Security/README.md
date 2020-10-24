@@ -262,13 +262,296 @@ const token = jwt.sign({ _id: 'abc123' }, 'SECRET_RANDOM_SERIES_OF_CHARS', {
 
 ### 6. Generating Authentication Tokens
 
+We're going to turn our attention back to the login end point and we're going to set this up to actually generate a JSON Web token and send it back to the user. We'll also do the exact same thing for signing up. If we just signed up we shouldn't have to log in in order to start doing things. We know we're that user because we just created our account. So both of these requests are going to end up sending back JWT authentication tokens.
+
+```js
+// src/routers/user.js
+//...
+const user = await User.findByCredentials(email, password); // look at the User (User = model)
+const token = await user.generateAuthToken(); // look at the user (user = instance)
+//...
+```
+
+```js
+// src/models/user.js
+//...
+userSchema.methods.generateAuthToken = async function () {...} // `methods`
+userSchema.statics.findByCredentials = async (email, password) => {...} // `statics`
+//...
+```
+
+So **statics** methods are accessible on the **model** sometimes called **Model methods** and our **methods** are accessible on the **instances** sometimes called **instance methods**.
+
+---
+
+```js
+// src/routers/user.js
+//...
+router.post('/users/login', async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const user = await User.findByCredentials(email, password);
+    const token = await user.generateAuthToken();
+    res.send({ user, token });
+  } catch (error) {
+    res.status(400).send();
+  }
+});
+//...
+```
+
+```js
+// src/models/user.js
+//...
+userSchema.methods.generateAuthToken = async function () {
+  const user = this;
+  const token = jwt.sign({ _id: user._id.toString() }, 'OUR_SECRET');
+  return token;
+};
+//...
+```
+
+Now currently no request requires authentication but we're work on fixing that shortly!
+
+One thing we'll notice about the current setup is that **we're not keeping track of this token value anywhere on the server**. The server simply generates it with the correct secret and sends it back. This has an important implication: **users can't truly log out**. This token as long as it exists means the user is logged in.
+
+So if it gets in the wrong hands a user has no way to log out and invalidate a given token. We can go ahead and fix that by tracking tokens we generate for users. This will allow a user to log in from multiple devices like their laptop and a phone then they'd be able to log out of one while still being logged in to the other. So all we're going to do is store all of the tokens we generate for a user.
+
+Then let's add the tokens in our User model:
+
+```js
+// src/models/user.js
+const userSchema = new mongoose.Schema({
+  //...
+  tokens: [
+    {
+      token: {
+        type: String,
+        required: true,
+      },
+    },
+  ],
+});
+//...
+```
+
+```js
+// src/routers/user.js
+//...
+// When the user signup
+router.post('/users', async (req, res) => {
+  const user = new User(req.body);
+
+  try {
+    await user.save();
+    const token = await user.generateAuthToken();
+    res.status(201).send({ user, token });
+  } catch (error) {
+    res.status(400).send(error.message);
+  }
+});
+//...
+```
+
 ### 7. Express Middleware
+
+Remember every single request to the API is going to **require authentication** with the exception of **sign up** and **log in** for everything else the client is going to need to provide that authentication token and the server is going to validate it before performing whatever operation they're trying to do.
+
+**Express middleware** is going to be at the core of allowing us to get all of this done.
+
+```js
+// MIDDLEWARES
+// without middleware: new request -> run route handler
+// with middleware: new request -> do something -> run route handler
+app.use((req, res, next) => {
+  console.log(req.method, req.path); // for example GET / users
+  next();
+});
+```
+
+Maybe we want to log out some statistics about the request so we can keep track of it in our server logs or maybe we want to check if there is a valid authentication token... And once the middleware runs we can continue to choose to run the regular route handler so the given operation is completed successfully. We could allow the route handler to run or we could prevent it from running if the user isn't authenticated as an example.
+
+```js
+// src/index.js
+//...
+app.use((req, res, next) => {
+  // just an example where we "disable" all the GET request
+  if (req.method === 'GET') {
+    res.send('GET requests are disable');
+  } else {
+    next();
+  }
+});
+//...
+```
+
+---
+
+Challenge time: setup a middleware for maintenance mode!
+
+```js
+// src/index.js
+//...
+app.use((req, res, next) => {
+  res.status(503).send('Site is currently down. Check back soon!');
+});
+//...
+```
 
 ### 8. Accepting Authentication Tokens
 
+We will check for an incoming authentication token, it will verify that it is a valid JSON Web Token. Then it will find the associated user. How to set up middleware for an individual route?
+
+```js
+// src/middleware/auth.js
+const auth = async (req, res, next) => {
+  console.log('[auth-middleware]');
+  next();
+};
+
+module.exports = auth;
+```
+
+```js
+// src/routers/user.js
+const express = require('express');
+const router = new express.Router();
+const auth = require('../middleware/auth'); // import auth middleware
+const User = require('../models/user');
+//...
+// router . get (route path, MIDDLEWARE, roothandler)
+router.get('/users/me', auth, async (req, res) => {
+  //...
+});
+//...
+module.exports = router;
+```
+
+Now remember it's only ever going to run the root handler if the middleware calls that next function...
+
+Then we should go to Postman, "Read users" (`GET /users`) and add a header property.
+
+```sh
+Key: Authorization
+Value: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI1ZjkyN2VhOGVlMWFhNzViYzMyZTQ5NTIiLCJpYXQiOjE2MDM1MzgzNTR9.aYY8yLjfBD909fGsMG91ZMbb1DvtK4TIUlY5hnfpiPE
+```
+
+So this is no one as a **bearer token** in which the client provides the token with the request. They're trying to perform and this is all the client is going to need to do to actually provide the information necessary to get authenticated.
+
+Let's go back to our middleware. We're going to load two things: the JWT library so we can validate the token being provided and we're also going to load in the User model so we can find them in the database once we've validated the auth token.
+
+```js
+const jsonwebtoken = require('jsonwebtoken');
+
+const jwt = require('jsonwebtoken');
+const User = require('../models/user');
+
+const auth = async (req, res, next) => {
+  try {
+    // 1 – we get the token in the header request
+    const token = req.header('Authorization').replace('Bearer ', '');
+    console.log('*** token: ', token); // token:  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI1ZjkyN2VhOGVlMWFhNzViYzMyZTQ5NTIiLCJpYXQiOjE2MDM1MzgzNTR9.aYY8yLjfBD909fGsMG91ZMbb1DvtK4TIUlY5hnfpiPE
+    // 2 – we verify it and we decode it
+    const decode = jwt.verify(token, 'OUR_SECRET');
+    console.log('*** decode: ', decode); // decode:  { _id: '5f927ea8ee1aa75bc32e4952', iat: 1603538354 }
+    // 3 – we find the user based on the decoded _id and we check if the token exists inside of this user
+    const user = await User.findOne({ _id: decode._id, 'tokens.token': token });
+
+    if (!user) {
+      throw new Error();
+    }
+    console.log('*** user: ', user); // user: [user data]
+    req.user = user; // passing the user to the root handler to avoid doing it twice...
+    next();
+  } catch (error) {
+    res.status(401).send({ error: 'Please authenticate!' });
+  }
+};
+
+module.exports = auth;
+```
+
+The other thing we're going to do is give that root handler access to the user that we fetched from the database we already fetched them and there's no need for the root handlers to have to fetch the user again as that would just **waste resources and time**. We can actually add a property onto request to store this. And the root handlers will be able to access it later on.
+
+```js
+router.get('/users/me', auth, async (req, res) => {
+  res.send(req.user); // req.user to get the user save previously in the middleware
+});
+```
+
+---
+
+Summary:
+
+1. The first thing we did is **we set up a middleware function to run for this specific routes** to the route that we want to lock down with authentication.
+2. We passed the **middleware function in as the second argument**. And the **root handler in as the third**.
+3. The middleware function itself starts by **looking for the header** that the user is supposed to provide and then **validates** that header and it **finds the associated user** from there.
+4. One of two things happen either we call next. **Letting the root handler run** or if they're not authenticated we go ahead and send back an error letting them know that they're not able to perform the operation that they're trying to perform.
+
 ### 9. Advanced Postman
 
+Let's focus on Postman, and especially **Postman environments** and **Postman environment variables**.
+
+To illustrate how environments are going to play a role in postman let's start off with an example. So right now all of our requests are being made to `localhost:3000` and that's good because that's where our server is running. Later on, we're also going to deploy the task manager API to Heroku and in that case we'll have a different URL.
+
+We're also going to want to test those production end points from Postman and that would mean us manually swapping out every URL for each different requests. Let's use the **Postman environments**.
+
+Let's also define our authentication Bearer token for all requests. Via `Edit` the collection, then `Authorization`. We should also go to the specific requests where we don't need the `Authorization`. For example in our case, **signup** and **login**. Then we should specify `No Auth` for them.
+
+Now there's just one more thing we're going to do to **take this to the next level**. And this is going to require us to set up a little bit of JavaScript code to perform some automation. So what's the one manual part of this workflow. The manual part is either creating a user and logging in then getting that off token going back over to the menu to update the value and then being able to make their requests. We can have all of that done automatically for us by writing just three or four lines of JavaScript code.
+
+So we have `Pre-request Script` where we can add some **JavaScript code to run before the request** is sent off. And we also have `Tests`. Now **this runs after the response is received** and in here we can write some JavaScript code to extract that token property on the body and set an environment variable whose value is equal to that token. From there we'll use the environment variable inside of the collection to get everything working as expected.
+
+![postman](../img/s12/12-1-postman.png 'postman')
+![postman](../img/s12/12-2-postman.png 'postman')
+
+```js
+// inside `Tests` in our Login user request
+if (pm.response.code === 200) {
+  pm.environment.set('authToken', pm.response.json().token);
+}
+```
+
+The code above is checking we get `200` response status and then wet the token (`authToken`) which will be automatically available for us.
+
+```js
+// inside `Tests` in our Create user request
+if (pm.response.code === 201) {
+  pm.environment.set('authToken', pm.response.json().token);
+}
+```
+
+---
+
+Summary:
+
+1. We started by creating Postman environments. An environment is nothing more than a name for our environment and a key value pair of values we can access when working in that environment. Now once we have our environments in place we can switch between them.
+2. We saw the collections edit page where we set up authentication for every single request in the collection except for signing up or logging in.
+
 ### 10. Logging Out
+
+Let's create the route and the logic for logout a user.
+
+Remember if we have five different sessions where we are logged in such as for our personal computer or our phone and our work computer and we log out of one we don't want to log out of everything. So we want to target these specific token that was used when they authenticated right here.
+
+```js
+// src/routers/user.js
+//...
+router.post('/users/logout', auth, async (req, res) => {
+  try {
+    req.user.tokens = req.user.tokens.filter((token) => {
+      return token.token !== req.token; // don't forget to pass `req.token` from the middleware
+    });
+    await req.user.save();
+    res.send();
+  } catch (error) {
+    res.status(500).send();
+  }
+});
+//...
+```
+
+Now what if you wanted to create a variation of this route that allows you to log out of all sessions so you can see services like Netflix and Gmail that allow you to do this.
 
 ### 11. Hiding Private Data
 

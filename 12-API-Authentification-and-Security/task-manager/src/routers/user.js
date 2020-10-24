@@ -1,13 +1,15 @@
 const express = require('express');
 const router = new express.Router();
+const auth = require('../middleware/auth'); // import auth middleware
 const User = require('../models/user');
 
 router.post('/users', async (req, res) => {
   const user = new User(req.body);
 
   try {
-    await user.save();
-    res.status(201).send(user);
+    // await user.save();
+    const token = await user.generateAuthToken();
+    res.status(201).send({ user, token });
   } catch (error) {
     res.status(400).send(error.message);
   }
@@ -17,10 +19,37 @@ router.post('/users/login', async (req, res) => {
   const { email, password } = req.body;
   try {
     const user = await User.findByCredentials(email, password);
-    res.send(user);
+    const token = await user.generateAuthToken();
+    res.send({ user, token });
   } catch (error) {
     res.status(400).send();
   }
+});
+
+router.post('/users/logout', auth, async (req, res) => {
+  try {
+    req.user.tokens = req.user.tokens.filter((token) => {
+      return token.token !== req.token;
+    });
+    await req.user.save();
+    res.send();
+  } catch (error) {
+    res.status(500).send();
+  }
+});
+
+router.post('/users/logout_all', auth, async (req, res) => {
+  try {
+    req.user.tokens = [];
+    await req.user.save();
+    res.send();
+  } catch (error) {
+    res.status(500).send();
+  }
+});
+
+router.get('/users/me', auth, async (req, res) => {
+  res.send(req.user);
 });
 
 router.get('/users', async (req, res) => {
