@@ -69,19 +69,19 @@ app.listen(port, () => {
 
 // // ----------
 
-const Task = require('./models/task');
-const User = require('./models/user');
+// const Task = require('./models/task');
+// const User = require('./models/user');
 
-const main = async () => {
-  // ONE WAY – populate user info from the task id!
-  const task = await Task.findById('5f954643ef13668529cdaff1'); // task id
-  await task.populate('owner').execPopulate(); // populate
-  console.log('owner: ', task.owner);
+// const main = async () => {
+//   // ONE WAY – populate user info from the task id!
+//   const task = await Task.findById('5f954643ef13668529cdaff1'); // task id
+//   await task.populate('owner').execPopulate(); // populate
+//   console.log('owner: ', task.owner);
 
-  // THE OTHER WAY – populate tasks info from a user id!
-  const user = await User.findById('5f9543420e75268479a39dc7'); // user id
-  await user.populate('tasks').execPopulate(); // populate (look at the code above)
-  console.log('tasks: ', user.tasks);
-};
+//   // THE OTHER WAY – populate tasks info from a user id!
+//   const user = await User.findById('5f9543420e75268479a39dc7'); // user id
+//   await user.populate('tasks').execPopulate(); // populate (look at the code above)
+//   console.log('tasks: ', user.tasks);
+// };
 
-main();
+// main();
