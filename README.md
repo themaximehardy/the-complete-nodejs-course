@@ -16,7 +16,7 @@ _Notes based on Andrew Mead's fantastic course._
 | 10  | [ MongoDB and Promises (Task App) ](10-MongoDB-and-Promises/README.md)                            |
 | 11  | [ REST APIs and Mongoose (Task App) ](11-REST-APIs-and-Mongoose/README.md)                        |
 | 12  | [ API Authentification and Security (Task App) ](12-API-Authentification-and-Security/README.md)  |
-| 13  | [ Sorting, Pagination, and Filtering (Task App) ]()                                               |
+| 13  | [ Sorting, Pagination, and Filtering (Task App) ](13-Sorting-Pagination-and-Filtering/README.md)  |
 | 14  | [ File Uploads (Task App) ]()                                                                     |
 | 15  | [ Sending Emails (Task App) ]()                                                                   |
 | 16  | [ Testing Node.js (Task App) ]()                                                                  |
