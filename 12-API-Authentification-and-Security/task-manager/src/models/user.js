@@ -9,6 +9,11 @@ const userSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
+  isAdmin: {
+    type: Boolean,
+    required: true,
+    default: false,
+  },
   password: {
     type: String,
     required: true,
@@ -49,6 +54,35 @@ const userSchema = new mongoose.Schema({
     },
   ],
 });
+
+userSchema.virtual('tasks', {
+  ref: 'Task',
+  localField: '_id',
+  foreignField: 'owner',
+});
+
+userSchema.methods.getPublicProfile = function () {
+  const user = this;
+  const userObject = user.toObject(); // we can actually manipulate user object to change what we expose
+
+  delete userObject.password;
+  delete userObject.tokens;
+
+  return userObject;
+};
+
+userSchema.methods.toJSON = function () {
+  const user = this;
+  const userObject = user.toObject();
+
+  if (!userObject.isAdmin) {
+    delete userObject.isAdmin;
+  }
+  delete userObject.password;
+  delete userObject.tokens;
+
+  return userObject;
+};
 
 userSchema.methods.generateAuthToken = async function () {
   const user = this;

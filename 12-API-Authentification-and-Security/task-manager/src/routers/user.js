@@ -1,13 +1,18 @@
 const express = require('express');
 const router = new express.Router();
-const auth = require('../middleware/auth'); // import auth middleware
+const auth = require('../middleware/auth');
+const admin = require('../middleware/admin');
 const User = require('../models/user');
 
+/**
+ * SIGNUP
+ * NOT PROTECTED
+ * CREATE A NEW USER (and generates a new token)
+ */
 router.post('/users', async (req, res) => {
   const user = new User(req.body);
 
   try {
-    // await user.save();
     const token = await user.generateAuthToken();
     res.status(201).send({ user, token });
   } catch (error) {
@@ -15,6 +20,11 @@ router.post('/users', async (req, res) => {
   }
 });
 
+/**
+ * LOGIN
+ * NOT PROTECTED
+ * LOG IN A USER (and generates a new token)
+ */
 router.post('/users/login', async (req, res) => {
   const { email, password } = req.body;
   try {
@@ -26,6 +36,11 @@ router.post('/users/login', async (req, res) => {
   }
 });
 
+/**
+ * LOGOUT
+ * AS TO BE AUTHENTICATED
+ * LOG OUT A USER (by removing the right token)
+ */
 router.post('/users/logout', auth, async (req, res) => {
   try {
     req.user.tokens = req.user.tokens.filter((token) => {
@@ -38,6 +53,11 @@ router.post('/users/logout', auth, async (req, res) => {
   }
 });
 
+/**
+ * LOGOUT
+ * AS TO BE AUTHENTICATED
+ * LOG OUT A USER (by removing all the tokens)
+ */
 router.post('/users/logout_all', auth, async (req, res) => {
   try {
     req.user.tokens = [];
@@ -48,11 +68,21 @@ router.post('/users/logout_all', auth, async (req, res) => {
   }
 });
 
+/**
+ * GET INFO USER
+ * AS TO BE AUTHENTICATED
+ * RETURN BASICS INFO ABOUT THE USER
+ */
 router.get('/users/me', auth, async (req, res) => {
   res.send(req.user);
 });
 
-router.get('/users', async (req, res) => {
+/**
+ * GET ALL USERS INFO
+ * AS TO BE ADMIN
+ * RETURN ALL INFORMATION ABOUT ALL USERS
+ */
+router.get('/users', admin, async (req, res) => {
   try {
     const users = await User.find({});
     res.send(users);
@@ -61,7 +91,12 @@ router.get('/users', async (req, res) => {
   }
 });
 
-router.get('/users/:id', async (req, res) => {
+/**
+ * GET INFO ABOUT A SPECIFIC USER
+ * AS TO BE ADMIN
+ * RETURN ALL INFORMATION ABOUT A SPECIFIC USER
+ */
+router.get('/users/:id', admin, async (req, res) => {
   const _id = req.params.id;
   try {
     const user = await User.findById(_id);
@@ -74,7 +109,39 @@ router.get('/users/:id', async (req, res) => {
   }
 });
 
-router.patch('/users/:id', async (req, res) => {
+/**
+ * UPDATE ITS OWN PROFILE
+ * AS TO BE AUTHENTICATED
+ * UPDATE SPECIFIC INFO ABOUT ITS OWN PROFILE
+ */
+router.patch('/users/me', auth, async (req, res) => {
+  const { body } = req;
+
+  const updates = Object.keys(body);
+  const allowedUpdates = ['name', 'email', 'password', 'age'];
+  const isValidOperation = updates.every((update) => allowedUpdates.includes(update));
+
+  if (!isValidOperation) {
+    return res.status(400).send({ error: 'Invalid update' });
+  }
+
+  try {
+    updates.forEach((update) => {
+      req.user[update] = body[update];
+    });
+    await req.user.save();
+    res.send(req.user);
+  } catch (error) {
+    res.status(400).send(error.message);
+  }
+});
+
+/**
+ * UPDATE A SPECIFIC USER PROFILE
+ * AS TO BE ADMIN
+ * UPDATE SPECIFIC INFO ABOUT A SPECIFIC USER PROFILE
+ */
+router.patch('/users/:id', admin, async (req, res) => {
   const { body, params } = req;
   const _id = params.id;
 
@@ -108,7 +175,26 @@ router.patch('/users/:id', async (req, res) => {
   }
 });
 
-router.delete('/users/:id', async (req, res) => {
+/**
+ * DELETE ITS OWN PROFILE
+ * AS TO BE AUTHENTICATED
+ * DELETE ITS OWN PROFILE (and automatically logout)
+ */
+router.delete('/users/me', auth, async (req, res) => {
+  try {
+    await req.user.remove();
+    res.send(req.user);
+  } catch (error) {
+    res.status(500).send();
+  }
+});
+
+/**
+ * DELETE A SPECIFIC USER PROFILE
+ * AS TO BE ADMIN
+ * DELETE A SPECIFIC USER PROFILE (and automatically logout it)
+ */
+router.delete('/users/:id', admin, async (req, res) => {
   const _id = req.params.id;
 
   try {

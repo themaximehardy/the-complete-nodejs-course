@@ -555,9 +555,534 @@ Now what if you wanted to create a variation of this route that allows you to lo
 
 ### 11. Hiding Private Data
 
+We're going to take a few moments to talk about how we can better secure the user profile data we're sending from these server. When we log in currently, what we receive is –
+
+```json
+{
+  "user": {
+    "age": 0,
+    "_id": "5f927ea8ee1aa75bc32e4952",
+    "name": "Maxime H.",
+    "email": "max@hardy.com",
+    "password": "$2a$08$wmTlJdpeHXhPjqfFpadueukvBxxltGcl98Ptg.i4ZLkY1aDzPJvCK", // WE DON'T WANT TO EXPOSE IT
+    "__v": 10,
+    "tokens": [
+      {
+        //... NO NEED TO EXPOSE ALL THE TOKENS
+      }
+    ]
+  },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI1ZjkyN2VhOGVlMWFhNzViYzMyZTQ5NTIiLCJpYXQiOjE2MDM2MTE2MjN9.vPKT18XRt328R0jpYqxh1sLVrb2GR4Ix7zYvTuKHpmc"
+}
+```
+
+Let's make some changes to prevent the signup and login to expose everything...
+
+```js
+// src/routers/user.js
+//...
+router.post('/users/login', async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const user = await User.findByCredentials(email, password);
+    const token = await user.generateAuthToken();
+    res.send({ user: user.getPublicProfile(), token }); // we add `getPublicProfile` which will return only data we want to expose
+  } catch (error) {
+    res.status(400).send();
+  }
+});
+//...
+```
+
+```js
+// src/models/user.js
+//...
+userSchema.methods.getPublicProfile = function () {
+  const user = this;
+  const userObject = user.toObject(); // we can actually manipulate user object to change what we expose
+
+  delete userObject.password;
+  delete userObject.tokens;
+
+  return userObject;
+};
+//...
+```
+
+Here is the result:
+
+```json
+{
+  "user": {
+    "age": 0,
+    "_id": "5f927ea8ee1aa75bc32e4952",
+    "name": "Maxime H.",
+    "email": "max@hardy.com",
+    "__v": 11
+  },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI1ZjkyN2VhOGVlMWFhNzViYzMyZTQ5NTIiLCJpYXQiOjE2MDM2MTIyNTR9.ePTtHOssV1QHhD1Pk_7AtLsP8edRpevr6zcifqC3Uw4"
+}
+```
+
+So now that we have this in place we have a **pretty manual way** to get the job done. And it's manual because we have to call our function `getPublicProfile` every single time we're sending the user back...
+
+**There is a way to automate this**. That's not going to require us to make any changes to our route handlers. That's the second solution.
+
+It is important to write `toJSON` exaclty like this (and we can remove the call to `getPublicProfile`) from the `routers`. It automatically works!
+
+```js
+// src/models/user.js
+//...
+userSchema.methods.toJSON = function () {
+  const user = this;
+  const userObject = user.toObject();
+
+  delete userObject.password;
+  delete userObject.tokens;
+
+  return userObject;
+};
+//...
+```
+
+How does it work?
+
+```js
+const pet = {
+  name: 'Hal',
+  age: 3,
+  password: 'abc123',
+};
+
+pet.toJSON = function () {
+  console.log(this); // { name: 'Hal', age: 3, password: 'abc123', toJSON: [Function] }
+  delete this.password;
+  return this;
+};
+
+console.log(JSON.stringify(pet)); // {"name":"Hal","age":3}
+```
+
 ### 12. Authenticating User Endpoints
 
+We've added a middleware `admin` which check if `isAdmin` is `true`.
+
+```js
+// src/middleware/admin.js
+const jwt = require('jsonwebtoken');
+const User = require('../models/user');
+
+const auth = async (req, res, next) => {
+  try {
+    // 1 – we get the token in the header request
+    const token = req.header('Authorization').replace('Bearer ', '');
+    // 2 – we verify it and we decode it
+    const decode = jwt.verify(token, 'OUR_SECRET');
+    // 3 – we find the user based on the decoded _id and we check if the token exists inside of this user
+    const admin = await User.findOne({ _id: decode._id, isAdmin: true, 'tokens.token': token });
+
+    if (!admin) {
+      throw new Error();
+    }
+
+    req.token = token;
+    req.user = admin;
+    next();
+  } catch (error) {
+    res.status(401).send({ error: 'No access' });
+  }
+};
+
+module.exports = auth;
+```
+
+```js
+//...
+userSchema.methods.toJSON = function () {
+  const user = this;
+  const userObject = user.toObject();
+
+  if (!userObject.isAdmin) {
+    delete userObject.isAdmin; // we also don't want to return the value if `isAdmin` is `false` (security reasons)
+  }
+  delete userObject.password;
+  delete userObject.tokens;
+
+  return userObject;
+};
+//...
+```
+
+```js
+// src/routers/user.js
+const express = require('express');
+const router = new express.Router();
+const auth = require('../middleware/auth');
+const admin = require('../middleware/admin');
+const User = require('../models/user');
+
+/**
+ * SIGNUP
+ * NOT PROTECTED
+ * CREATE A NEW USER (and generates a new token)
+ */
+router.post('/users', async (req, res) => {
+  const user = new User(req.body);
+
+  try {
+    const token = await user.generateAuthToken();
+    res.status(201).send({ user, token });
+  } catch (error) {
+    res.status(400).send(error.message);
+  }
+});
+
+/**
+ * LOGIN
+ * NOT PROTECTED
+ * LOG IN A USER (and generates a new token)
+ */
+router.post('/users/login', async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const user = await User.findByCredentials(email, password);
+    const token = await user.generateAuthToken();
+    res.send({ user, token });
+  } catch (error) {
+    res.status(400).send();
+  }
+});
+
+/**
+ * LOGOUT
+ * AS TO BE AUTHENTICATED
+ * LOG OUT A USER (by removing the right token)
+ */
+router.post('/users/logout', auth, async (req, res) => {
+  try {
+    req.user.tokens = req.user.tokens.filter((token) => {
+      return token.token !== req.token;
+    });
+    await req.user.save();
+    res.send();
+  } catch (error) {
+    res.status(500).send();
+  }
+});
+
+/**
+ * LOGOUT
+ * AS TO BE AUTHENTICATED
+ * LOG OUT A USER (by removing all the tokens)
+ */
+router.post('/users/logout_all', auth, async (req, res) => {
+  try {
+    req.user.tokens = [];
+    await req.user.save();
+    res.send();
+  } catch (error) {
+    res.status(500).send();
+  }
+});
+
+/**
+ * GET INFO USER
+ * AS TO BE AUTHENTICATED
+ * RETURN BASICS INFO ABOUT THE USER
+ */
+router.get('/users/me', auth, async (req, res) => {
+  res.send(req.user);
+});
+
+/**
+ * GET ALL USERS INFO
+ * AS TO BE ADMIN
+ * RETURN ALL INFORMATION ABOUT ALL USERS
+ */
+router.get('/users', admin, async (req, res) => {
+  try {
+    const users = await User.find({});
+    res.send(users);
+  } catch (error) {
+    res.status(500).send();
+  }
+});
+
+/**
+ * GET INFO ABOUT A SPECIFIC USER
+ * AS TO BE ADMIN
+ * RETURN ALL INFORMATION ABOUT A SPECIFIC USER
+ */
+router.get('/users/:id', admin, async (req, res) => {
+  const _id = req.params.id;
+  try {
+    const user = await User.findById(_id);
+    if (!user) {
+      return res.status(404).send();
+    }
+    res.send(user);
+  } catch (error) {
+    res.status(500).send();
+  }
+});
+
+/**
+ * UPDATE ITS OWN PROFILE
+ * AS TO BE AUTHENTICATED
+ * UPDATE SPECIFIC INFO ABOUT ITS OWN PROFILE
+ */
+router.patch('/users/me', auth, async (req, res) => {
+  const { body } = req;
+
+  const updates = Object.keys(body);
+  const allowedUpdates = ['name', 'email', 'password', 'age'];
+  const isValidOperation = updates.every((update) => allowedUpdates.includes(update));
+
+  if (!isValidOperation) {
+    return res.status(400).send({ error: 'Invalid update' });
+  }
+
+  try {
+    updates.forEach((update) => {
+      req.user[update] = body[update];
+    });
+    await req.user.save();
+    res.send(req.user);
+  } catch (error) {
+    res.status(400).send(error.message);
+  }
+});
+
+/**
+ * UPDATE A SPECIFIC USER PROFILE
+ * AS TO BE ADMIN
+ * UPDATE SPECIFIC INFO ABOUT A SPECIFIC USER PROFILE
+ */
+router.patch('/users/:id', admin, async (req, res) => {
+  const { body, params } = req;
+  const _id = params.id;
+
+  const updates = Object.keys(body);
+  const allowedUpdates = ['name', 'email', 'password', 'age'];
+  const isValidOperation = updates.every((update) => allowedUpdates.includes(update));
+
+  if (!isValidOperation) {
+    return res.status(400).send({ error: 'Invalid update' });
+  }
+
+  try {
+    // 1 – below is bypassing mongoose as a result, or middlewares...
+    // const user = await User.findByIdAndUpdate(_id, body, { new: true, runValidators: true });
+
+    // 2 – we need to use another way then
+    const user = await User.findById(_id);
+
+    if (!user) {
+      return res.status(404).send();
+    }
+
+    // 2.1 – then...
+    updates.forEach((update) => {
+      user[update] = body[update];
+    });
+    await user.save();
+    res.send(user);
+  } catch (error) {
+    res.status(400).send(error.message);
+  }
+});
+
+/**
+ * DELETE ITS OWN PROFILE
+ * AS TO BE AUTHENTICATED
+ * DELETE ITS OWN PROFILE (and automatically logout)
+ */
+router.delete('/users/me', auth, async (req, res) => {
+  try {
+    await req.user.remove();
+    res.send(req.user);
+  } catch (error) {
+    res.status(500).send();
+  }
+});
+
+/**
+ * DELETE A SPECIFIC USER PROFILE
+ * AS TO BE ADMIN
+ * DELETE A SPECIFIC USER PROFILE (and automatically logout it)
+ */
+router.delete('/users/:id', admin, async (req, res) => {
+  const _id = req.params.id;
+
+  try {
+    const user = await User.findByIdAndDelete(_id);
+    if (!user) {
+      return res.status(404).send();
+    }
+    res.send(user);
+  } catch (error) {
+    res.status(500).send();
+  }
+});
+
+module.exports = router;
+```
+
 ### 13. The User/Task Relationship
+
+Now that the **user endpoints** are **sitting behind authentication** we're going to turn our attention towards our **tasks**. We haven't worked with tasks in a while and if we're going to set up authentication there's a few important things we need to do.
+
+First up we need to figure out how to **create a relationship** between a **user** and the **tasks** that they've created. This is going to be important to make sure that users can only access and manage their tasks and that they can't mess with someone else's.
+
+There are two ways to create the relationship between them. The user could store something like the `_id` of all of the tasks they've created OR the individual task could store the `_id` of the user who created it. The second approach is the better approach.
+
+```js
+// src/models/task.js
+const mongoose = require('mongoose');
+
+const taskSchema = {
+  description: {
+    type: String,
+    required: true,
+  },
+  completed: {
+    type: Boolean,
+    default: false,
+  },
+  owner: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
+  },
+};
+
+const Task = mongoose.model('Task', taskSchema);
+
+module.exports = Task;
+```
+
+In our `routers` task, we need to add our `auth` middleware and then add the information about the user.
+
+```js
+// src/routers/task.js
+//...
+router.post('/tasks', auth, async (req, res) => {
+  const task = new Task({
+    ...req.body,
+    owner: req.user._id, // we get it from our middleware
+  });
+
+  try {
+    await task.save();
+    res.status(201).send(task);
+  } catch (error) {
+    res.status(400).send(error);
+  }
+});
+//...
+```
+
+```json
+{
+  "completed": true,
+  "_id": "5f954643ef13668529cdaff1",
+  "description": "The PNG array is down, program the 1080p interface so we can bypass the AGP card!",
+  "owner": "5f9543420e75268479a39dc7", // we got the owner
+  "__v": 0
+}
+```
+
+---
+
+```js
+const Task = require('./models/task');
+const User = require('./models/user');
+
+const main = async () => {
+  const task = await Task.findById('5f954643ef13668529cdaff1');
+  const user = await User.findById(task.owner);
+  console.log('task: ', task);
+  console.log('user: ', user); // ok but long and manual
+};
+
+main();
+```
+
+There's a way to actually set up the relationship between our two models and it's gonna provide us with some helper functions that will make this possible with very minimal code...
+
+In the `task` model:
+
+```js
+//...
+owner: {
+  type: mongoose.Schema.Types.ObjectId,
+  required: true,
+  ref: 'User' // Add the ref to the `User` model
+},
+//...
+```
+
+```js
+const Task = require('./models/task');
+
+const main = async () => {
+  const task = await Task.findById('5f954643ef13668529cdaff1');
+  await task.populate('owner').execPopulate();
+  console.log('task: ', task);
+};
+
+main();
+```
+
+```js
+// result
+task:  {
+  completed: true,
+  _id: 5f954643ef13668529cdaff1,
+  description: 'The PNG array is down, program the 1080p interface so we can bypass the AGP card!',
+  owner: {
+    isAdmin: false,
+    age: 0,
+    _id: 5f9543420e75268479a39dc7,
+    name: 'Maxime Hardy',
+    email: 'user@hardy.com',
+    password: '$2a$08$8CWrvqA3hA1NSic/r5UfmudX3rn7E4cLQPJxeQ/Z5ZyvLSqbJEdbu',
+    tokens: [ [Object], [Object], [Object], [Object] ],
+    __v: 3
+  },
+  __v: 0
+}
+```
+
+---
+
+```js
+// src/models/user.js
+userSchema.virtual('tasks', {
+  ref: 'Task',
+  localField: '_id',
+  foreignField: 'owner',
+});
+```
+
+```js
+// src/index.js (as playground)
+const Task = require('./models/task');
+const User = require('./models/user');
+
+const main = async () => {
+  // ONE WAY – populate user info from the task id!
+  const task = await Task.findById('5f954643ef13668529cdaff1'); // task id
+  await task.populate('owner').execPopulate(); // populate
+  console.log('owner: ', task.owner);
+
+  // THE OTHER WAY – populate tasks info from a user id!
+  const user = await User.findById('5f9543420e75268479a39dc7'); // user id
+  await user.populate('tasks').execPopulate(); // populate (look at the code above)
+  console.log('tasks: ', user.tasks);
+};
+
+main();
+```
 
 ### 14. Authenticating Task Endpoints
 
