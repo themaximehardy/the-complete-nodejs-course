@@ -17,7 +17,7 @@ _Notes based on Andrew Mead's fantastic course._
 | 11  | [ REST APIs and Mongoose (Task App) ](11-REST-APIs-and-Mongoose/README.md)                        |
 | 12  | [ API Authentification and Security (Task App) ](12-API-Authentification-and-Security/README.md)  |
 | 13  | [ Sorting, Pagination, and Filtering (Task App) ](13-Sorting-Pagination-and-Filtering/README.md)  |
-| 14  | [ File Uploads (Task App) ]()                                                                     |
+| 14  | [ File Uploads (Task App) ](14-File-Uploads/README.md)                                            |
 | 15  | [ Sending Emails (Task App) ]()                                                                   |
 | 16  | [ Testing Node.js (Task App) ]()                                                                  |
 | 17  | [ Real-Time Web Applications with Socket.io (Chat App) ]()                                        |
